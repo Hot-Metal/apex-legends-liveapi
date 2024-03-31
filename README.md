@@ -12,6 +12,8 @@ Within this project is the `events.proto` file, which is the Apex Legends game e
 protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto.cmd --ts_proto_out=. ./events.proto
 ```
 
+Alternatively this can be run using `npm run start`
+
 ## Obtaining the Proto File
 
 ### Steam
