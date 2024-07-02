@@ -621,6 +621,15 @@ export interface CustomMatchSetTeamName {
   teamName: string;
 }
 
+/**
+ * Select a pre-determined spawn point in the map for the team.
+ * Requires special access. Set spawnPoint to -1 to unset.
+ */
+export interface CustomMatchSetSpawnPoint {
+  teamId: number;
+  spawnPoint: number;
+}
+
 /** Request to programatically send a chat message to the entire custom match lobby */
 export interface CustomMatchSendChat {
   text: string;
@@ -662,6 +671,7 @@ export interface Request {
   customMatchGetLobbyPlayers?: CustomMatchGetLobbyPlayers | undefined;
   customMatchSetTeamName?: CustomMatchSetTeamName | undefined;
   customMatchGetSettings?: CustomMatchGetSettings | undefined;
+  customMatchSetSpawnPoint?: CustomMatchSetSpawnPoint | undefined;
 }
 
 /**
@@ -6854,6 +6864,80 @@ export const CustomMatchSetTeamName = {
   },
 };
 
+function createBaseCustomMatchSetSpawnPoint(): CustomMatchSetSpawnPoint {
+  return { teamId: 0, spawnPoint: 0 };
+}
+
+export const CustomMatchSetSpawnPoint = {
+  encode(message: CustomMatchSetSpawnPoint, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.teamId !== 0) {
+      writer.uint32(8).int32(message.teamId);
+    }
+    if (message.spawnPoint !== 0) {
+      writer.uint32(16).int32(message.spawnPoint);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CustomMatchSetSpawnPoint {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCustomMatchSetSpawnPoint();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.teamId = reader.int32();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.spawnPoint = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CustomMatchSetSpawnPoint {
+    return {
+      teamId: isSet(object.teamId) ? globalThis.Number(object.teamId) : 0,
+      spawnPoint: isSet(object.spawnPoint) ? globalThis.Number(object.spawnPoint) : 0,
+    };
+  },
+
+  toJSON(message: CustomMatchSetSpawnPoint): unknown {
+    const obj: any = {};
+    if (message.teamId !== 0) {
+      obj.teamId = Math.round(message.teamId);
+    }
+    if (message.spawnPoint !== 0) {
+      obj.spawnPoint = Math.round(message.spawnPoint);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CustomMatchSetSpawnPoint>, I>>(base?: I): CustomMatchSetSpawnPoint {
+    return CustomMatchSetSpawnPoint.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CustomMatchSetSpawnPoint>, I>>(object: I): CustomMatchSetSpawnPoint {
+    const message = createBaseCustomMatchSetSpawnPoint();
+    message.teamId = object.teamId ?? 0;
+    message.spawnPoint = object.spawnPoint ?? 0;
+    return message;
+  },
+};
+
 function createBaseCustomMatchSendChat(): CustomMatchSendChat {
   return { text: "" };
 }
@@ -6929,6 +7013,7 @@ function createBaseRequest(): Request {
     customMatchGetLobbyPlayers: undefined,
     customMatchSetTeamName: undefined,
     customMatchGetSettings: undefined,
+    customMatchSetSpawnPoint: undefined,
   };
 }
 
@@ -6981,6 +7066,9 @@ export const Request = {
     }
     if (message.customMatchGetSettings !== undefined) {
       CustomMatchGetSettings.encode(message.customMatchGetSettings, writer.uint32(170).fork()).ldelim();
+    }
+    if (message.customMatchSetSpawnPoint !== undefined) {
+      CustomMatchSetSpawnPoint.encode(message.customMatchSetSpawnPoint, writer.uint32(178).fork()).ldelim();
     }
     return writer;
   },
@@ -7104,6 +7192,13 @@ export const Request = {
 
           message.customMatchGetSettings = CustomMatchGetSettings.decode(reader, reader.uint32());
           continue;
+        case 22:
+          if (tag !== 178) {
+            break;
+          }
+
+          message.customMatchSetSpawnPoint = CustomMatchSetSpawnPoint.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7154,6 +7249,9 @@ export const Request = {
         : undefined,
       customMatchGetSettings: isSet(object.customMatchGetSettings)
         ? CustomMatchGetSettings.fromJSON(object.customMatchGetSettings)
+        : undefined,
+      customMatchSetSpawnPoint: isSet(object.customMatchSetSpawnPoint)
+        ? CustomMatchSetSpawnPoint.fromJSON(object.customMatchSetSpawnPoint)
         : undefined,
     };
   },
@@ -7207,6 +7305,9 @@ export const Request = {
     }
     if (message.customMatchGetSettings !== undefined) {
       obj.customMatchGetSettings = CustomMatchGetSettings.toJSON(message.customMatchGetSettings);
+    }
+    if (message.customMatchSetSpawnPoint !== undefined) {
+      obj.customMatchSetSpawnPoint = CustomMatchSetSpawnPoint.toJSON(message.customMatchSetSpawnPoint);
     }
     return obj;
   },
@@ -7267,6 +7368,10 @@ export const Request = {
     message.customMatchGetSettings =
       (object.customMatchGetSettings !== undefined && object.customMatchGetSettings !== null)
         ? CustomMatchGetSettings.fromPartial(object.customMatchGetSettings)
+        : undefined;
+    message.customMatchSetSpawnPoint =
+      (object.customMatchSetSpawnPoint !== undefined && object.customMatchSetSpawnPoint !== null)
+        ? CustomMatchSetSpawnPoint.fromPartial(object.customMatchSetSpawnPoint)
         : undefined;
     return message;
   },
