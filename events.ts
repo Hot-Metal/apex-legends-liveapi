@@ -358,8 +358,16 @@ export interface RevenantForgedShadowDamaged {
 export interface PlayerRespawnTeam {
   timestamp: number;
   category: string;
-  player: Player | undefined;
+  player:
+    | Player
+    | undefined;
+  /**
+   * `respawned` field is being deprecated in favor of `teammates`
+   *
+   * @deprecated
+   */
   respawned: string;
+  respawnedTeammates: Player[];
 }
 
 /**
@@ -4047,7 +4055,7 @@ export const RevenantForgedShadowDamaged = {
 };
 
 function createBasePlayerRespawnTeam(): PlayerRespawnTeam {
-  return { timestamp: 0, category: "", player: undefined, respawned: "" };
+  return { timestamp: 0, category: "", player: undefined, respawned: "", respawnedTeammates: [] };
 }
 
 export const PlayerRespawnTeam = {
@@ -4063,6 +4071,9 @@ export const PlayerRespawnTeam = {
     }
     if (message.respawned !== "") {
       writer.uint32(34).string(message.respawned);
+    }
+    for (const v of message.respawnedTeammates) {
+      Player.encode(v!, writer.uint32(42).fork()).ldelim();
     }
     return writer;
   },
@@ -4102,6 +4113,13 @@ export const PlayerRespawnTeam = {
 
           message.respawned = reader.string();
           continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.respawnedTeammates.push(Player.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4117,6 +4135,9 @@ export const PlayerRespawnTeam = {
       category: isSet(object.category) ? globalThis.String(object.category) : "",
       player: isSet(object.player) ? Player.fromJSON(object.player) : undefined,
       respawned: isSet(object.respawned) ? globalThis.String(object.respawned) : "",
+      respawnedTeammates: globalThis.Array.isArray(object?.respawnedTeammates)
+        ? object.respawnedTeammates.map((e: any) => Player.fromJSON(e))
+        : [],
     };
   },
 
@@ -4134,6 +4155,9 @@ export const PlayerRespawnTeam = {
     if (message.respawned !== "") {
       obj.respawned = message.respawned;
     }
+    if (message.respawnedTeammates?.length) {
+      obj.respawnedTeammates = message.respawnedTeammates.map((e) => Player.toJSON(e));
+    }
     return obj;
   },
 
@@ -4148,6 +4172,7 @@ export const PlayerRespawnTeam = {
       ? Player.fromPartial(object.player)
       : undefined;
     message.respawned = object.respawned ?? "";
+    message.respawnedTeammates = object.respawnedTeammates?.map((e) => Player.fromPartial(e)) || [];
     return message;
   },
 };
