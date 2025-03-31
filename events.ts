@@ -5,7 +5,7 @@ import Long = require("long");
 
 export const protobufPackage = "rtech.liveapi";
 
-/** Enum used to quickly described the target of a ChangeCamera operation */
+/** Enum used to describe the target of a ChangeCamera operation */
 export enum PlayerOfInterest {
   UNSPECIFIED = 0,
   /** NEXT - cycle through known Players in a team */
@@ -71,6 +71,64 @@ export function playerOfInterestToJSON(object: PlayerOfInterest): string {
   }
 }
 
+/** Enum used to segment the current map into main areas */
+export enum MapRegion {
+  TOP_LEFT = 0,
+  TOP_RIGHT = 1,
+  BOTTOM_LEFT = 2,
+  BOTTOM_RIGHT = 3,
+  CENTER = 4,
+  REGIONS_COUNT = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function mapRegionFromJSON(object: any): MapRegion {
+  switch (object) {
+    case 0:
+    case "TOP_LEFT":
+      return MapRegion.TOP_LEFT;
+    case 1:
+    case "TOP_RIGHT":
+      return MapRegion.TOP_RIGHT;
+    case 2:
+    case "BOTTOM_LEFT":
+      return MapRegion.BOTTOM_LEFT;
+    case 3:
+    case "BOTTOM_RIGHT":
+      return MapRegion.BOTTOM_RIGHT;
+    case 4:
+    case "CENTER":
+      return MapRegion.CENTER;
+    case 5:
+    case "REGIONS_COUNT":
+      return MapRegion.REGIONS_COUNT;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return MapRegion.UNRECOGNIZED;
+  }
+}
+
+export function mapRegionToJSON(object: MapRegion): string {
+  switch (object) {
+    case MapRegion.TOP_LEFT:
+      return "TOP_LEFT";
+    case MapRegion.TOP_RIGHT:
+      return "TOP_RIGHT";
+    case MapRegion.BOTTOM_LEFT:
+      return "BOTTOM_LEFT";
+    case MapRegion.BOTTOM_RIGHT:
+      return "BOTTOM_RIGHT";
+    case MapRegion.CENTER:
+      return "CENTER";
+    case MapRegion.REGIONS_COUNT:
+      return "REGIONS_COUNT";
+    case MapRegion.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface Vector3 {
   x: number;
   y: number;
@@ -101,6 +159,19 @@ export interface CustomMatchLobbyPlayer {
   hardwareName: string;
 }
 
+export interface CustomMatchTeam {
+  id: number;
+  name: string;
+  /** can be -1 if not set */
+  spawnPoint: number;
+}
+
+export interface LegendMatchStatus {
+  name: string;
+  reference: string;
+  banned: boolean;
+}
+
 export interface Datacenter {
   timestamp: number;
   category: string;
@@ -126,6 +197,13 @@ export interface LoadoutConfiguration {
   equipment: InventoryItem[];
 }
 
+export interface PauseStateChangeNotification {
+  timestamp: number;
+  isPausing: boolean;
+  timeLeft: number;
+  message: string;
+}
+
 /**
  * Traffic initialization
  * This message is sent upon successfully connecting over WebSockets
@@ -142,11 +220,20 @@ export interface Init {
 
 /**
  * Response to the CustomMatch_GetLobbyPlayers
- * Contains the list of all players in the lobby
+ * Contains the list of all players in the lobby along with the teams, their names and spawnPoints if selected
  */
 export interface CustomMatchLobbyPlayers {
   playerToken: string;
   players: CustomMatchLobbyPlayer[];
+  teams: CustomMatchTeam[];
+}
+
+/**
+ * Response to CustomMatch_GetLegendBanStatus
+ * Contains a list of all legends, their localized name and whether or not they have been banned
+ */
+export interface CustomMatchLegendBanStatus {
+  legends: LegendMatchStatus[];
 }
 
 /** Event when the observer camera switches from viewing one player to another */
@@ -326,6 +413,19 @@ export interface SquadEliminated {
 }
 
 /**
+ * Sent as soon as a player's ultimate is fully charged
+ * Note that some ultimates may be ready to be used before fully charged
+ * For convenience, the ultimate is passed as the linkedEntity.
+ * For example: `linkedEntity: "Ultimate (Rolling Thunder)"` for Bangalore's Ultimate ability
+ */
+export interface PlayerUltimateCharged {
+  timestamp: number;
+  category: string;
+  player: Player | undefined;
+  linkedEntity: string;
+}
+
+/**
  * Occurs when Gibraltars shield has taken any enemy damage
  * The field `damageInflicted` will indicate how much was absorbed by the shield
  */
@@ -361,11 +461,7 @@ export interface PlayerRespawnTeam {
   player:
     | Player
     | undefined;
-  /**
-   * `respawned` field is being deprecated in favor of `teammates`
-   *
-   * @deprecated
-   */
+  /** `respawned` field is being deprecated in favor of `teammates` */
   respawned: string;
   respawnedTeammates: Player[];
 }
@@ -546,7 +642,10 @@ export interface ChangeCamera {
   name?: string | undefined;
 }
 
-/** Request message to toggle pause in a match type that supports it */
+/**
+ * Request message to toggle pause in a match type that supports it
+ * After submitting this request, listen for PauseStateChangeNotification messages for specific information from the server
+ */
 export interface PauseToggle {
   preTimer: number;
 }
@@ -638,6 +737,33 @@ export interface CustomMatchSetSpawnPoint {
   spawnPoint: number;
 }
 
+/**
+ * Request to override ring end and exclude a particular area
+ * Requires special access. Set sectionToExclude to REGIONS_COUNT or higher to reset.
+ * It is recommended to reset exclusions after every match as they persist in the match settings
+ */
+export interface CustomMatchSetEndRingExclusion {
+  sectionToExclude: MapRegion;
+}
+
+/**
+ * Request to review the list of banned legends for this Custom Match.
+ * The response to this event is the message CustomMatch_LegendBanStatus
+ */
+export interface CustomMatchGetLegendBanStatus {
+}
+
+/**
+ * Request to set the banned legends in this match. This should be a comma-separated list and the list of all banned legends must be passed in each time in this request
+ * In other words, the list that this request contains will always replace the Custom Match setting. Banned legends will persist with the Custom Match lobby.
+ * To reset the list of banned legends, send this request with an empty list
+ * To obtain valid values for this list, use the CustomMatch_GetLegendBanStatus. The field LegendMatchStatus.reference is what can be submitted in this API call
+ * Note that these strings are case-sensitive.
+ */
+export interface CustomMatchSetLegendBan {
+  legendRefs: string[];
+}
+
 /** Request to programatically send a chat message to the entire custom match lobby */
 export interface CustomMatchSendChat {
   text: string;
@@ -680,6 +806,9 @@ export interface Request {
   customMatchSetTeamName?: CustomMatchSetTeamName | undefined;
   customMatchGetSettings?: CustomMatchGetSettings | undefined;
   customMatchSetSpawnPoint?: CustomMatchSetSpawnPoint | undefined;
+  customMatchSetEndRingExclusion?: CustomMatchSetEndRingExclusion | undefined;
+  customMatchGetLegendBanStatus?: CustomMatchGetLegendBanStatus | undefined;
+  customMatchSetLegendBan?: CustomMatchSetLegendBan | undefined;
 }
 
 /**
@@ -1188,6 +1317,184 @@ export const CustomMatchLobbyPlayer = {
   },
 };
 
+function createBaseCustomMatchTeam(): CustomMatchTeam {
+  return { id: 0, name: "", spawnPoint: 0 };
+}
+
+export const CustomMatchTeam = {
+  encode(message: CustomMatchTeam, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.id !== 0) {
+      writer.uint32(8).uint32(message.id);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.spawnPoint !== 0) {
+      writer.uint32(24).int32(message.spawnPoint);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CustomMatchTeam {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCustomMatchTeam();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.id = reader.uint32();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.spawnPoint = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CustomMatchTeam {
+    return {
+      id: isSet(object.id) ? globalThis.Number(object.id) : 0,
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      spawnPoint: isSet(object.spawnPoint) ? globalThis.Number(object.spawnPoint) : 0,
+    };
+  },
+
+  toJSON(message: CustomMatchTeam): unknown {
+    const obj: any = {};
+    if (message.id !== 0) {
+      obj.id = Math.round(message.id);
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.spawnPoint !== 0) {
+      obj.spawnPoint = Math.round(message.spawnPoint);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CustomMatchTeam>, I>>(base?: I): CustomMatchTeam {
+    return CustomMatchTeam.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CustomMatchTeam>, I>>(object: I): CustomMatchTeam {
+    const message = createBaseCustomMatchTeam();
+    message.id = object.id ?? 0;
+    message.name = object.name ?? "";
+    message.spawnPoint = object.spawnPoint ?? 0;
+    return message;
+  },
+};
+
+function createBaseLegendMatchStatus(): LegendMatchStatus {
+  return { name: "", reference: "", banned: false };
+}
+
+export const LegendMatchStatus = {
+  encode(message: LegendMatchStatus, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.reference !== "") {
+      writer.uint32(18).string(message.reference);
+    }
+    if (message.banned !== false) {
+      writer.uint32(24).bool(message.banned);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LegendMatchStatus {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLegendMatchStatus();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.reference = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.banned = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LegendMatchStatus {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      reference: isSet(object.reference) ? globalThis.String(object.reference) : "",
+      banned: isSet(object.banned) ? globalThis.Boolean(object.banned) : false,
+    };
+  },
+
+  toJSON(message: LegendMatchStatus): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.reference !== "") {
+      obj.reference = message.reference;
+    }
+    if (message.banned !== false) {
+      obj.banned = message.banned;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LegendMatchStatus>, I>>(base?: I): LegendMatchStatus {
+    return LegendMatchStatus.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LegendMatchStatus>, I>>(object: I): LegendMatchStatus {
+    const message = createBaseLegendMatchStatus();
+    message.name = object.name ?? "";
+    message.reference = object.reference ?? "";
+    message.banned = object.banned ?? false;
+    return message;
+  },
+};
+
 function createBaseDatacenter(): Datacenter {
   return { timestamp: 0, category: "", name: "" };
 }
@@ -1548,6 +1855,110 @@ export const LoadoutConfiguration = {
   },
 };
 
+function createBasePauseStateChangeNotification(): PauseStateChangeNotification {
+  return { timestamp: 0, isPausing: false, timeLeft: 0, message: "" };
+}
+
+export const PauseStateChangeNotification = {
+  encode(message: PauseStateChangeNotification, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.timestamp !== 0) {
+      writer.uint32(8).uint64(message.timestamp);
+    }
+    if (message.isPausing !== false) {
+      writer.uint32(16).bool(message.isPausing);
+    }
+    if (message.timeLeft !== 0) {
+      writer.uint32(24).uint64(message.timeLeft);
+    }
+    if (message.message !== "") {
+      writer.uint32(34).string(message.message);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): PauseStateChangeNotification {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePauseStateChangeNotification();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.timestamp = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.isPausing = reader.bool();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.timeLeft = longToNumber(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.message = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PauseStateChangeNotification {
+    return {
+      timestamp: isSet(object.timestamp) ? globalThis.Number(object.timestamp) : 0,
+      isPausing: isSet(object.isPausing) ? globalThis.Boolean(object.isPausing) : false,
+      timeLeft: isSet(object.timeLeft) ? globalThis.Number(object.timeLeft) : 0,
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+    };
+  },
+
+  toJSON(message: PauseStateChangeNotification): unknown {
+    const obj: any = {};
+    if (message.timestamp !== 0) {
+      obj.timestamp = Math.round(message.timestamp);
+    }
+    if (message.isPausing !== false) {
+      obj.isPausing = message.isPausing;
+    }
+    if (message.timeLeft !== 0) {
+      obj.timeLeft = Math.round(message.timeLeft);
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PauseStateChangeNotification>, I>>(base?: I): PauseStateChangeNotification {
+    return PauseStateChangeNotification.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PauseStateChangeNotification>, I>>(object: I): PauseStateChangeNotification {
+    const message = createBasePauseStateChangeNotification();
+    message.timestamp = object.timestamp ?? 0;
+    message.isPausing = object.isPausing ?? false;
+    message.timeLeft = object.timeLeft ?? 0;
+    message.message = object.message ?? "";
+    return message;
+  },
+};
+
 function createBaseInit(): Init {
   return { timestamp: 0, category: "", gameVersion: "", apiVersion: undefined, platform: "", name: "" };
 }
@@ -1685,7 +2096,7 @@ export const Init = {
 };
 
 function createBaseCustomMatchLobbyPlayers(): CustomMatchLobbyPlayers {
-  return { playerToken: "", players: [] };
+  return { playerToken: "", players: [], teams: [] };
 }
 
 export const CustomMatchLobbyPlayers = {
@@ -1695,6 +2106,9 @@ export const CustomMatchLobbyPlayers = {
     }
     for (const v of message.players) {
       CustomMatchLobbyPlayer.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+    for (const v of message.teams) {
+      CustomMatchTeam.encode(v!, writer.uint32(26).fork()).ldelim();
     }
     return writer;
   },
@@ -1720,6 +2134,13 @@ export const CustomMatchLobbyPlayers = {
 
           message.players.push(CustomMatchLobbyPlayer.decode(reader, reader.uint32()));
           continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.teams.push(CustomMatchTeam.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1735,6 +2156,7 @@ export const CustomMatchLobbyPlayers = {
       players: globalThis.Array.isArray(object?.players)
         ? object.players.map((e: any) => CustomMatchLobbyPlayer.fromJSON(e))
         : [],
+      teams: globalThis.Array.isArray(object?.teams) ? object.teams.map((e: any) => CustomMatchTeam.fromJSON(e)) : [],
     };
   },
 
@@ -1746,6 +2168,9 @@ export const CustomMatchLobbyPlayers = {
     if (message.players?.length) {
       obj.players = message.players.map((e) => CustomMatchLobbyPlayer.toJSON(e));
     }
+    if (message.teams?.length) {
+      obj.teams = message.teams.map((e) => CustomMatchTeam.toJSON(e));
+    }
     return obj;
   },
 
@@ -1756,6 +2181,68 @@ export const CustomMatchLobbyPlayers = {
     const message = createBaseCustomMatchLobbyPlayers();
     message.playerToken = object.playerToken ?? "";
     message.players = object.players?.map((e) => CustomMatchLobbyPlayer.fromPartial(e)) || [];
+    message.teams = object.teams?.map((e) => CustomMatchTeam.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseCustomMatchLegendBanStatus(): CustomMatchLegendBanStatus {
+  return { legends: [] };
+}
+
+export const CustomMatchLegendBanStatus = {
+  encode(message: CustomMatchLegendBanStatus, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.legends) {
+      LegendMatchStatus.encode(v!, writer.uint32(26).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CustomMatchLegendBanStatus {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCustomMatchLegendBanStatus();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.legends.push(LegendMatchStatus.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CustomMatchLegendBanStatus {
+    return {
+      legends: globalThis.Array.isArray(object?.legends)
+        ? object.legends.map((e: any) => LegendMatchStatus.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CustomMatchLegendBanStatus): unknown {
+    const obj: any = {};
+    if (message.legends?.length) {
+      obj.legends = message.legends.map((e) => LegendMatchStatus.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CustomMatchLegendBanStatus>, I>>(base?: I): CustomMatchLegendBanStatus {
+    return CustomMatchLegendBanStatus.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CustomMatchLegendBanStatus>, I>>(object: I): CustomMatchLegendBanStatus {
+    const message = createBaseCustomMatchLegendBanStatus();
+    message.legends = object.legends?.map((e) => LegendMatchStatus.fromPartial(e)) || [];
     return message;
   },
 };
@@ -3804,6 +4291,112 @@ export const SquadEliminated = {
     message.timestamp = object.timestamp ?? 0;
     message.category = object.category ?? "";
     message.players = object.players?.map((e) => Player.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBasePlayerUltimateCharged(): PlayerUltimateCharged {
+  return { timestamp: 0, category: "", player: undefined, linkedEntity: "" };
+}
+
+export const PlayerUltimateCharged = {
+  encode(message: PlayerUltimateCharged, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.timestamp !== 0) {
+      writer.uint32(8).uint64(message.timestamp);
+    }
+    if (message.category !== "") {
+      writer.uint32(18).string(message.category);
+    }
+    if (message.player !== undefined) {
+      Player.encode(message.player, writer.uint32(26).fork()).ldelim();
+    }
+    if (message.linkedEntity !== "") {
+      writer.uint32(34).string(message.linkedEntity);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): PlayerUltimateCharged {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePlayerUltimateCharged();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.timestamp = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.category = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.player = Player.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.linkedEntity = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PlayerUltimateCharged {
+    return {
+      timestamp: isSet(object.timestamp) ? globalThis.Number(object.timestamp) : 0,
+      category: isSet(object.category) ? globalThis.String(object.category) : "",
+      player: isSet(object.player) ? Player.fromJSON(object.player) : undefined,
+      linkedEntity: isSet(object.linkedEntity) ? globalThis.String(object.linkedEntity) : "",
+    };
+  },
+
+  toJSON(message: PlayerUltimateCharged): unknown {
+    const obj: any = {};
+    if (message.timestamp !== 0) {
+      obj.timestamp = Math.round(message.timestamp);
+    }
+    if (message.category !== "") {
+      obj.category = message.category;
+    }
+    if (message.player !== undefined) {
+      obj.player = Player.toJSON(message.player);
+    }
+    if (message.linkedEntity !== "") {
+      obj.linkedEntity = message.linkedEntity;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PlayerUltimateCharged>, I>>(base?: I): PlayerUltimateCharged {
+    return PlayerUltimateCharged.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PlayerUltimateCharged>, I>>(object: I): PlayerUltimateCharged {
+    const message = createBasePlayerUltimateCharged();
+    message.timestamp = object.timestamp ?? 0;
+    message.category = object.category ?? "";
+    message.player = (object.player !== undefined && object.player !== null)
+      ? Player.fromPartial(object.player)
+      : undefined;
+    message.linkedEntity = object.linkedEntity ?? "";
     return message;
   },
 };
@@ -6963,6 +7556,169 @@ export const CustomMatchSetSpawnPoint = {
   },
 };
 
+function createBaseCustomMatchSetEndRingExclusion(): CustomMatchSetEndRingExclusion {
+  return { sectionToExclude: 0 };
+}
+
+export const CustomMatchSetEndRingExclusion = {
+  encode(message: CustomMatchSetEndRingExclusion, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sectionToExclude !== 0) {
+      writer.uint32(8).int32(message.sectionToExclude);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CustomMatchSetEndRingExclusion {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCustomMatchSetEndRingExclusion();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sectionToExclude = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CustomMatchSetEndRingExclusion {
+    return { sectionToExclude: isSet(object.sectionToExclude) ? mapRegionFromJSON(object.sectionToExclude) : 0 };
+  },
+
+  toJSON(message: CustomMatchSetEndRingExclusion): unknown {
+    const obj: any = {};
+    if (message.sectionToExclude !== 0) {
+      obj.sectionToExclude = mapRegionToJSON(message.sectionToExclude);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CustomMatchSetEndRingExclusion>, I>>(base?: I): CustomMatchSetEndRingExclusion {
+    return CustomMatchSetEndRingExclusion.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CustomMatchSetEndRingExclusion>, I>>(
+    object: I,
+  ): CustomMatchSetEndRingExclusion {
+    const message = createBaseCustomMatchSetEndRingExclusion();
+    message.sectionToExclude = object.sectionToExclude ?? 0;
+    return message;
+  },
+};
+
+function createBaseCustomMatchGetLegendBanStatus(): CustomMatchGetLegendBanStatus {
+  return {};
+}
+
+export const CustomMatchGetLegendBanStatus = {
+  encode(_: CustomMatchGetLegendBanStatus, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CustomMatchGetLegendBanStatus {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCustomMatchGetLegendBanStatus();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): CustomMatchGetLegendBanStatus {
+    return {};
+  },
+
+  toJSON(_: CustomMatchGetLegendBanStatus): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CustomMatchGetLegendBanStatus>, I>>(base?: I): CustomMatchGetLegendBanStatus {
+    return CustomMatchGetLegendBanStatus.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CustomMatchGetLegendBanStatus>, I>>(_: I): CustomMatchGetLegendBanStatus {
+    const message = createBaseCustomMatchGetLegendBanStatus();
+    return message;
+  },
+};
+
+function createBaseCustomMatchSetLegendBan(): CustomMatchSetLegendBan {
+  return { legendRefs: [] };
+}
+
+export const CustomMatchSetLegendBan = {
+  encode(message: CustomMatchSetLegendBan, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.legendRefs) {
+      writer.uint32(10).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CustomMatchSetLegendBan {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCustomMatchSetLegendBan();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.legendRefs.push(reader.string());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CustomMatchSetLegendBan {
+    return {
+      legendRefs: globalThis.Array.isArray(object?.legendRefs)
+        ? object.legendRefs.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CustomMatchSetLegendBan): unknown {
+    const obj: any = {};
+    if (message.legendRefs?.length) {
+      obj.legendRefs = message.legendRefs;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CustomMatchSetLegendBan>, I>>(base?: I): CustomMatchSetLegendBan {
+    return CustomMatchSetLegendBan.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CustomMatchSetLegendBan>, I>>(object: I): CustomMatchSetLegendBan {
+    const message = createBaseCustomMatchSetLegendBan();
+    message.legendRefs = object.legendRefs?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseCustomMatchSendChat(): CustomMatchSendChat {
   return { text: "" };
 }
@@ -7039,6 +7795,9 @@ function createBaseRequest(): Request {
     customMatchSetTeamName: undefined,
     customMatchGetSettings: undefined,
     customMatchSetSpawnPoint: undefined,
+    customMatchSetEndRingExclusion: undefined,
+    customMatchGetLegendBanStatus: undefined,
+    customMatchSetLegendBan: undefined,
   };
 }
 
@@ -7094,6 +7853,15 @@ export const Request = {
     }
     if (message.customMatchSetSpawnPoint !== undefined) {
       CustomMatchSetSpawnPoint.encode(message.customMatchSetSpawnPoint, writer.uint32(178).fork()).ldelim();
+    }
+    if (message.customMatchSetEndRingExclusion !== undefined) {
+      CustomMatchSetEndRingExclusion.encode(message.customMatchSetEndRingExclusion, writer.uint32(186).fork()).ldelim();
+    }
+    if (message.customMatchGetLegendBanStatus !== undefined) {
+      CustomMatchGetLegendBanStatus.encode(message.customMatchGetLegendBanStatus, writer.uint32(194).fork()).ldelim();
+    }
+    if (message.customMatchSetLegendBan !== undefined) {
+      CustomMatchSetLegendBan.encode(message.customMatchSetLegendBan, writer.uint32(202).fork()).ldelim();
     }
     return writer;
   },
@@ -7224,6 +7992,27 @@ export const Request = {
 
           message.customMatchSetSpawnPoint = CustomMatchSetSpawnPoint.decode(reader, reader.uint32());
           continue;
+        case 23:
+          if (tag !== 186) {
+            break;
+          }
+
+          message.customMatchSetEndRingExclusion = CustomMatchSetEndRingExclusion.decode(reader, reader.uint32());
+          continue;
+        case 24:
+          if (tag !== 194) {
+            break;
+          }
+
+          message.customMatchGetLegendBanStatus = CustomMatchGetLegendBanStatus.decode(reader, reader.uint32());
+          continue;
+        case 25:
+          if (tag !== 202) {
+            break;
+          }
+
+          message.customMatchSetLegendBan = CustomMatchSetLegendBan.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7277,6 +8066,15 @@ export const Request = {
         : undefined,
       customMatchSetSpawnPoint: isSet(object.customMatchSetSpawnPoint)
         ? CustomMatchSetSpawnPoint.fromJSON(object.customMatchSetSpawnPoint)
+        : undefined,
+      customMatchSetEndRingExclusion: isSet(object.customMatchSetEndRingExclusion)
+        ? CustomMatchSetEndRingExclusion.fromJSON(object.customMatchSetEndRingExclusion)
+        : undefined,
+      customMatchGetLegendBanStatus: isSet(object.customMatchGetLegendBanStatus)
+        ? CustomMatchGetLegendBanStatus.fromJSON(object.customMatchGetLegendBanStatus)
+        : undefined,
+      customMatchSetLegendBan: isSet(object.customMatchSetLegendBan)
+        ? CustomMatchSetLegendBan.fromJSON(object.customMatchSetLegendBan)
         : undefined,
     };
   },
@@ -7333,6 +8131,17 @@ export const Request = {
     }
     if (message.customMatchSetSpawnPoint !== undefined) {
       obj.customMatchSetSpawnPoint = CustomMatchSetSpawnPoint.toJSON(message.customMatchSetSpawnPoint);
+    }
+    if (message.customMatchSetEndRingExclusion !== undefined) {
+      obj.customMatchSetEndRingExclusion = CustomMatchSetEndRingExclusion.toJSON(
+        message.customMatchSetEndRingExclusion,
+      );
+    }
+    if (message.customMatchGetLegendBanStatus !== undefined) {
+      obj.customMatchGetLegendBanStatus = CustomMatchGetLegendBanStatus.toJSON(message.customMatchGetLegendBanStatus);
+    }
+    if (message.customMatchSetLegendBan !== undefined) {
+      obj.customMatchSetLegendBan = CustomMatchSetLegendBan.toJSON(message.customMatchSetLegendBan);
     }
     return obj;
   },
@@ -7397,6 +8206,18 @@ export const Request = {
     message.customMatchSetSpawnPoint =
       (object.customMatchSetSpawnPoint !== undefined && object.customMatchSetSpawnPoint !== null)
         ? CustomMatchSetSpawnPoint.fromPartial(object.customMatchSetSpawnPoint)
+        : undefined;
+    message.customMatchSetEndRingExclusion =
+      (object.customMatchSetEndRingExclusion !== undefined && object.customMatchSetEndRingExclusion !== null)
+        ? CustomMatchSetEndRingExclusion.fromPartial(object.customMatchSetEndRingExclusion)
+        : undefined;
+    message.customMatchGetLegendBanStatus =
+      (object.customMatchGetLegendBanStatus !== undefined && object.customMatchGetLegendBanStatus !== null)
+        ? CustomMatchGetLegendBanStatus.fromPartial(object.customMatchGetLegendBanStatus)
+        : undefined;
+    message.customMatchSetLegendBan =
+      (object.customMatchSetLegendBan !== undefined && object.customMatchSetLegendBan !== null)
+        ? CustomMatchSetLegendBan.fromPartial(object.customMatchSetLegendBan)
         : undefined;
     return message;
   },
