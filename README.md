@@ -2,6 +2,12 @@
 
 The purpose of this repository is to serve as a central place for updates to the Apex Legends LiveAPI. This API is published with new versions of the game in the game files themselves. Most game updates, including ranked and season splits contain updates to this file.
 
+## Prerequisites
+
+[Protobuf Compiler](https://protobuf.dev/installation/)
+Nodejs
+.NET
+
 ## Obtaining the Proto File
 
 ### Steam
