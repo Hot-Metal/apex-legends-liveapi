@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "start": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto.cmd --ts_proto_out=./ts/. ../events.proto"
+  },
+  "dependencies": {
+    "ts-proto": "^1.170.0"
+  }
+}
