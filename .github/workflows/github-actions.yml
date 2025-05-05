@@ -29,6 +29,7 @@ jobs:
           npm install
           npx tsc
       - name: Publish to npm
+        working-directory: ts/apex-legends-liveapi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
         run: npm publish --access public
