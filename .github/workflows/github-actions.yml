@@ -5,13 +5,14 @@ jobs:
   build-node:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v4
         with:
           node-version: 18
       # - name: Install Protoc
       #   uses: arduino/setup-protoc@v3
       - name: Build Node Library
-        # working-directory: ts/apex-legends-liveapi
+        working-directory: ts/apex-legends-liveapi
         run: |
           pwd
           ls -la
