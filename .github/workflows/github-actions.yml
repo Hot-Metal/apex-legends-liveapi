@@ -1,6 +1,10 @@
 name: Build Libraries
 run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on: [push]
+
+env:
+  VERSION_NUMBER: 0.0.${{github.run_number}}
+
 jobs:
   build-node:
     runs-on: ubuntu-latest
@@ -11,6 +15,11 @@ jobs:
           node-version: 18
       # - name: Install Protoc
       #   uses: arduino/setup-protoc@v3
+            # Very important: versions the package.json node version which is the version that publish looks for 
+      # in the github release we create next
+      - name: NPM version v0.0.${{github.run_number}}
+        run: |
+          npm version $VERSION_NUMBER --git-tag-version false
       - name: Build Node Library
         working-directory: ts/apex-legends-liveapi
         run: |
