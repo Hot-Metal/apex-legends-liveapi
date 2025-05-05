@@ -8,10 +8,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Install Protobuf Compiler
-        run: |
-          apt install -y protobuf-compiler
-          protoc --version
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
       - name: Build Node Library
         working-directory: ts/apex-legends-liveapi
         run: |
