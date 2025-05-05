@@ -14,9 +14,9 @@ jobs:
         with:
           node-version: 18
       - name: Install Protobuf Compiler
-         run: |
-           sudo apt-get update && sudo apt-get install -y protobuf-compiler
-           protoc --version
+        run: |
+          sudo apt-get update && sudo apt-get install -y protobuf-compiler
+          protoc --version
       # Very important: versions the package.json node version which is the version that publish looks for 
       # in the github release we create next
       - name: NPM version v0.0.${{github.run_number}}
