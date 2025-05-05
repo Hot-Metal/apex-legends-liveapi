@@ -13,9 +13,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-      # - name: Install Protoc
-      #   uses: arduino/setup-protoc@v3
-            # Very important: versions the package.json node version which is the version that publish looks for 
+      - name: Install Protobuf Compiler
+         run: |
+           sudo apt-get update && sudo apt-get install -y protobuf-compiler
+           protoc --version
+      # Very important: versions the package.json node version which is the version that publish looks for 
       # in the github release we create next
       - name: NPM version v0.0.${{github.run_number}}
         working-directory: ts/apex-legends-liveapi
@@ -24,8 +26,6 @@ jobs:
       - name: Build Node Library
         working-directory: ts/apex-legends-liveapi
         run: |
-          pwd
-          ls -la
           npm install
           npx tsc
     
